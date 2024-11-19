@@ -1,36 +1,19 @@
-import numpy as np, torch, torch.nn as nn, wandb
-from torch.utils.data import Dataset, DataLoader
-from kan import KAN
+import torch
+import torch.nn as nn
+import numpy as np
+import wandb
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-import time, psutil, warnings, os
-
-# CUDA settings
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
-warnings.filterwarnings("ignore")
-torch.backends.cudnn.enabled = True
-torch.backends.cuda.matmul.allow_tf32 = True
-
-
-class FrankeBenchmarkDataset(Dataset):
-    # number of inputs: 2
-    def __init__(self, n_samples):
-        self.X = torch.rand(n_samples, 2)
-        self.y = torch.tensor(
-            [
-                0.75 * np.exp(-((9 * x - 2) ** 2) / 4 - ((9 * y - 2) ** 2) / 4)
-                + 0.75 * np.exp(-((9 * x + 1) ** 2) / 49 - (9 * y + 1) / 10)
-                + 0.5 * np.exp(-((9 * x - 7) ** 2) / 4 - ((9 * y - 3) ** 2) / 4)
-                - 0.2 * np.exp(-((9 * x - 4) ** 2) - ((9 * y - 7) ** 2))
-                for x, y in zip(self.X[:, 0], self.X[:, 1])
-            ]
-        ).float()
-
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
+from torch.utils.data import DataLoader
+from kan import KAN
+import time, psutil, os
+from datetime import datetime
+from Datasets import (
+    FrankeBenchmarkDataset,
+    Hartmann3D,
+    Ackley5D,
+    Michalewicz7D,
+    Levy10D,
+)
 
 
 class KANBenchmark:
@@ -73,7 +56,66 @@ class KANBenchmark:
             / 1024**2,
         }
 
-    def train_and_evaluate(self, n_samples=1000, batch_size=32, lr=0.01, epochs=20):
+    def _write_log_to_file(self, metrics, experiment_name, batch_size, lr, epochs):
+        """Write experiment results to a log file"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = "experiment_logs"
+        os.makedirs(log_dir, exist_ok=True)
+
+        filename = f"{log_dir}/{experiment_name}_{timestamp}.txt"
+
+        with open(filename, "w") as f:
+            f.write(f"KAN Benchmark Results - {experiment_name}\n")
+            f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Model Configuration: {self.config}\n\n")
+
+            f.write(f"Training Hyperparameters:\n")
+            f.write(f"Batch Size: {batch_size}\n")
+            f.write(f"Learning Rate: {lr}\n")
+            f.write(f"Epochs: {epochs}\n\n")
+
+            f.write(f"Model Information:\n")
+            f.write(f"Parameters: {metrics['params_count']:,}\n")
+            f.write(f"Model Size: {metrics['model_size_mb']:.2f} MB\n")
+            f.write(f"Training Time: {metrics['training_time']:.2f}s\n\n")
+
+            f.write(f"Performance Metrics:\n")
+            f.write(f"Training MSE: {metrics['train_mse']:.6f}\n")
+            f.write(f"Training RMSE: {metrics['train_rmse']:.6f}\n")
+            f.write(f"Training R²: {metrics['train_r2']:.4f}\n")
+            f.write(f"Test MSE: {metrics['test_mse']:.6f}\n")
+            f.write(f"Test RMSE: {metrics['test_rmse']:.6f}\n")
+            f.write(f"Test R²: {metrics['test_r2']:.4f}\n\n")
+
+            f.write(f"System Utilization:\n")
+            f.write(
+                f"RAM Usage: {metrics['ram_usage_gb']:.2f}GB ({metrics['ram_percent']}%)\n"
+            )
+            f.write(f"CPU Usage: {metrics['cpu_percent']}%\n")
+
+            if torch.cuda.is_available():
+                f.write(
+                    f"GPU Memory Allocated: {metrics['gpu_memory_allocated_gb']:.2f}GB\n"
+                )
+                f.write(
+                    f"GPU Memory Reserved: {metrics['gpu_memory_reserved_gb']:.2f}GB\n"
+                )
+                f.write(
+                    f"GPU Peak Memory: {metrics['gpu_max_memory_allocated_gb']:.2f}GB\n"
+                )
+                f.write(f"GPU Utilization: {metrics['gpu_utilization']}%\n")
+        return filename
+
+    def train_and_evaluate(
+        self,
+        n_samples=1000,
+        batch_size=64,
+        lr=0.05,
+        epochs=100,
+        train_loader=None,
+        test_loader=None,
+        dataset_class=None,
+    ):
         experiment_name = (
             f"KAN_Experiment_{self.config['width'][0]}to{self.config['width'][-1]}"
         )
@@ -81,18 +123,20 @@ class KANBenchmark:
 
         try:
             wandb.init(
-                project="kan-benchmarking",
+                project="kan-benchmarking-Acer_RTX_4060",
                 name=experiment_name,
                 config={**self._get_model_metrics(), **self.config},
                 reinit=True,
             )
 
-            train_loader = DataLoader(
-                FrankeBenchmarkDataset(n_samples), batch_size=batch_size, shuffle=True
-            )
-            test_loader = DataLoader(
-                FrankeBenchmarkDataset(n_samples // 4), batch_size=batch_size
-            )
+            # Use provided loaders or create new ones
+            if train_loader is None or test_loader is None:
+                train_loader = DataLoader(
+                    dataset_class(n_samples), batch_size=batch_size, shuffle=True
+                )
+                test_loader = DataLoader(
+                    dataset_class(n_samples // 4), batch_size=batch_size
+                )
             optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
             criterion = nn.MSELoss()
             start_time = time.time()
@@ -175,43 +219,14 @@ class KANBenchmark:
 
             wandb.log(results)
             wandb.finish()
+            # Write results to log file
+            log_file = self._write_log_to_file(
+                results, experiment_name, batch_size, lr, epochs
+            )
+            print(f"\nExperiment log saved to: {log_file}")
             return results
 
         except Exception as e:
             print(f"Error during training: {e}")
             wandb.finish()
             raise e
-
-
-if __name__ == "__main__":
-    config = {"width": [2, 3, 4, 1], "grid": 6, "k": 5, "seed": 42}
-    torch.manual_seed(42)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
-
-    benchmark = KANBenchmark(config)
-    try:
-        metrics = benchmark.train_and_evaluate(epochs=20)
-        print("\nKAN Benchmark Results")
-        print(f"Parameters: {metrics['params_count']:,}")
-        print(f"Model Size: {metrics['model_size_mb']:.2f} MB")
-        print(f"Training Time: {metrics['training_time']:.2f}s")
-        print(f"\nFinal Performance Metrics:")
-        print(f"Training MSE: {metrics['train_mse']:.6f}")
-        print(f"Training RMSE: {metrics['train_rmse']:.6f}")
-        print(f"Training R²: {metrics['train_r2']:.4f}")
-        print(f"Test MSE: {metrics['test_mse']:.6f}")
-        print(f"Test RMSE: {metrics['test_rmse']:.6f}")
-        print(f"Test R²: {metrics['test_r2']:.4f}")
-        print(f"\nSystem Utilization:")
-        print(f"RAM Usage: {metrics['ram_usage_gb']:.2f}GB ({metrics['ram_percent']}%)")
-        print(f"CPU Usage: {metrics['cpu_percent']}%")
-        if torch.cuda.is_available():
-            print(f"GPU Memory Allocated: {metrics['gpu_memory_allocated_gb']:.2f}GB")
-            print(f"GPU Memory Reserved: {metrics['gpu_memory_reserved_gb']:.2f}GB")
-            print(f"GPU Peak Memory: {metrics['gpu_max_memory_allocated_gb']:.2f}GB")
-            print(f"GPU Utilization: {metrics['gpu_utilization']}%")
-    except Exception as e:
-        print(f"Benchmark failed: {e}")
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
