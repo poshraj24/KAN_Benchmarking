@@ -51,12 +51,12 @@ def run_benchmark_suite(hyperparameters):
 
     # Extract hyperparameters
     n_samples = hyperparameters.get("n_samples", 1000)
-    batch_size = hyperparameters.get("batch_size", 64)
-    lr = hyperparameters.get("lr", 0.05)
+    batch_size = hyperparameters.get("batch_size", 80)
+    lr = hyperparameters.get("lr", 0.5)
     epochs = hyperparameters.get("epochs", 100)
-    hidden_layers = hyperparameters.get("hidden_layers", [8, 8])
-    grid = hyperparameters.get("grid", 4)
-    k = hyperparameters.get("k", 2)
+    hidden_layers = hyperparameters.get("hidden_layers", [12, 12])
+    grid = hyperparameters.get("grid", 7)
+    k = hyperparameters.get("k", 8)
     seed = hyperparameters.get("seed", 42)
 
     # Set random seeds
@@ -124,12 +124,12 @@ if __name__ == "__main__":
     # Define hyperparameters for the benchmark suite
     hyperparameters = {
         "n_samples": 1000,
-        "batch_size": 64,
-        "lr": 0.05,
+        "batch_size": 80,
+        "lr": 0.5,
         "epochs": 100,
-        "hidden_layers": [8, 8],  # Hidden layer dimensions
-        "grid": 4,
-        "k": 2,
+        "hidden_layers": [12, 12],  # Hidden layer dimensions
+        "grid": 7,
+        "k": 8,
         "seed": 42,
     }
 
