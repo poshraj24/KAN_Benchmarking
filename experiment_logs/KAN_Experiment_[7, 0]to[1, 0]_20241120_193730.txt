@@ -1,0 +1,29 @@
+KAN Benchmark Results - KAN_Experiment_[7, 0]to[1, 0]
+Timestamp: 2024-11-20 19:37:30
+Model Configuration: {'width': [[7, 0], [6, 0], [6, 0], [1, 0]], 'grid': 5, 'k': 6, 'seed': 42}
+
+Training Hyperparameters:
+Batch Size: 256
+Learning Rate: 0.5
+Epochs: 100
+
+Model Information:
+Parameters: 1,990
+Model Size: 0.01 MB
+Training Time: 321.53s
+
+Performance Metrics:
+Training MSE: 0.998727
+Training RMSE: 0.999363
+Training R²: -1.5078
+Test MSE: 1.025967
+Test RMSE: 1.012900
+Test R²: -1.5999
+
+System Utilization:
+RAM Usage: 0.97GB (95.1%)
+CPU Usage: 8.4%
+GPU Memory Allocated: 0.02GB
+GPU Memory Reserved: 0.03GB
+GPU Peak Memory: 0.02GB
+GPU Utilization: 38%
