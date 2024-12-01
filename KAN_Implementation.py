@@ -109,8 +109,8 @@ class KANBenchmark:
     def train_and_evaluate(
         self,
         n_samples=1000,
-        batch_size=64,
-        lr=0.05,
+        batch_size=16,
+        lr=0.5,
         epochs=100,
         train_loader=None,
         test_loader=None,
