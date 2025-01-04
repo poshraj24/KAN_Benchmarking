@@ -182,7 +182,7 @@ class KANScalingAnalysis:
 
             # Configure and create model
             model_config = {
-                "width": [input_dim] + [k] * 3 + [1],
+                "width": [input_dim] + [1] + [1],  # 2-3-5-7-10/1-1 architecture
                 "grid": grid,
                 "k": k,
                 "device": self.device,
@@ -269,7 +269,7 @@ class KANScalingAnalysis:
         return pd.DataFrame([r for r in all_results if r is not None])
 
     def visualize_scaling(self, df, save_path="kan_scaling_analysis.png"):
-        """Create visualization with memory usage"""
+        """Create visualization with improved y-axis scales"""
         if len(df) == 0:
             print("No data to visualize.")
             return
@@ -287,13 +287,21 @@ class KANScalingAnalysis:
         x = np.arange(len(self.k_values) * len(self.grid_sizes))
         x_labels = [f"K={k}\nGrid={g}" for k in self.k_values for g in self.grid_sizes]
 
-        # Plot 1: Parameters
+        # Plot 1: Parameters (log scale)
         for i, dataset in enumerate(unique_datasets):
             subset = df[df["dataset_name"] == dataset]
             ax1.plot(x, subset["n_params"], color=colors[i], marker="o", label=dataset)
+
         ax1.set_yscale("log")
-        ax1.set_ylabel("Number of Parameters (log scale)")
+        ax1.set_ylabel("Number of Parameters")
         ax1.set_title("Model Parameters by Configuration")
+
+        # Clean parameter ticks
+        param_ticks = [50, 100, 200, 500, 1000, 2000, 5000]
+        ax1.set_yticks(param_ticks)
+        ax1.set_yticklabels([str(x) for x in param_ticks])
+        ax1.yaxis.set_minor_locator(plt.LogLocator(subs=np.linspace(0.1, 0.9, 9)))
+        ax1.grid(True, which="both", alpha=0.2)
         ax1.legend()
 
         # Plot 2: Memory Usage
@@ -302,9 +310,16 @@ class KANScalingAnalysis:
             ax2.plot(
                 x, subset["peak_memory_gb"], color=colors[i], marker="s", label=dataset
             )
-        ax2.set_yscale("log")
-        ax2.set_ylabel("Peak Memory Usage (GB, log scale)")
+
+        # Set regular scale for memory with clean decimal ticks
+        min_mem = df["peak_memory_gb"].min()
+        max_mem = df["peak_memory_gb"].max()
+        memory_ticks = np.linspace(0.016, 0.024, 9)  # Adjusted based on your data range
+        ax2.set_yticks(memory_ticks)
+        ax2.set_yticklabels([f"{x:.3f}" for x in memory_ticks])
+        ax2.set_ylabel("Peak Memory Usage (GB)")
         ax2.set_title("Peak Memory Usage by Configuration")
+        ax2.grid(True, alpha=0.2)
         ax2.legend()
 
         # Plot 3: Final Loss
@@ -313,15 +328,23 @@ class KANScalingAnalysis:
             ax3.plot(
                 x, subset["final_loss"], color=colors[i], marker="^", label=dataset
             )
+
         ax3.set_ylabel("Final Loss")
         ax3.set_title("Final Loss by Configuration")
+
+        # Clean loss ticks with rounded numbers
+        loss_ticks = [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 18000]
+        ax3.set_yticks(loss_ticks)
+        ax3.set_yticklabels([str(x) for x in loss_ticks])
+        ax3.grid(True, alpha=0.2)
         ax3.legend()
 
         # Common x-axis settings
         for ax in [ax1, ax2, ax3]:
             ax.set_xticks(x)
             ax.set_xticklabels(x_labels, rotation=45)
-            ax.grid(True)
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
 
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
