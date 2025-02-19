@@ -43,7 +43,7 @@ def main():
 
         if len(results_df) > 0:
             # Create visualizations
-            analyzer.visualize_scaling(results_df)
+            KANScalingAnalysis.visualize_scaling(results_df)
 
             # Print summary statistics
             print("\nAnalysis Summary:")
