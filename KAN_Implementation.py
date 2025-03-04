@@ -45,12 +45,12 @@ class KANScalingAnalysis:
 
         # Training parameters
         self.n_samples = 1000
-        self.batch_size = 5048  # Increased for better GPU utilization
+        self.batch_size = 5048
         self.lr = 0.5
         self.epochs = 50
 
         # Parallel processing parameters
-        self.num_workers = 4  # DataLoader workers per process
+        self.num_workers = 4
         self.max_parallel_processes = 4
         self.batch_size_configs = 15
         self.prefetch_factor = 2
@@ -288,7 +288,7 @@ class KANScalingAnalysis:
 
         # X-axis labels
         x_labels = [
-            f"K={k}\nGrid={g}"
+            f"K{k}\nG{g}"
             for k in sorted(df["k_value"].unique())
             for g in sorted(df["grid_size"].unique())
         ]
